@@ -85,7 +85,7 @@ MetrHastw <- function(X0, sigmaprop, nsteps, f){
   X[1] <- X0
   for (i in 2:(nsteps+1)){
     Y <- rnorm(1, mean=X[i-1],sd=sigmaprop)
-    if (log(runif(1))<=min(log(f(Y))-log(f(X[i-1])),1)){
+    if (log(runif(1)) <= log(f(Y)) -log(f(X[i-1]))){
       X[i] <- Y}
     else{ X[i] <- X[i-1]}
    }
@@ -125,28 +125,6 @@ traceplot(chains_large) #it seems all of them cover the space but it's hard to s
 **Part b.**\
 Your solution begins here.
 
-```{r}
-shifted_exponential <- function(x) {
-  if (x>=2){
-    return (exp(-0.02*(x-2)))
-  }
-  else{
-    return (0)
-  }
-}
-
-plot(t, sapply(t, function(t) shifted_exponential(t)), type="l", xlab="x", ylab = "f(x)") #seems like a relatively good way to do my independence sampler
-
-#can maybe sample from it via inversion method
-
-shifted_samples <- function(lambda){
-  u <- runif(1)
-  return ((2*lambda - log(exp(2*lambda)-u)/lambda))
-} 
-
-
-```
-
 
 ```{r echo=FALSE}
 
@@ -167,16 +145,20 @@ target <- function(x) {
 MH_newprop <- function(X0, nsteps, f){
   X <- numeric(nsteps+1) 
   X[1] <- X0
+  
   for (i in 2:(nsteps+1)){
-    Y <- shifted_samples(0.1)
-    if (log(runif(1))<=min(log( (f(Y)*shifted_exponential(Y))/(f(X[i-1])*shifted_exponential(X[i-1]))),1)){
-      X[i] <- Y}
-    else{ X[i] <- X[i-1]}
+    Y <- runif(1, min=2, max=45)
+    log_acc <- log(f(Y)) - log(f(X[i-1])) #the proposal densities cancel out as they are the same everywhere 
+    
+    if (log(runif(1)) <= log_acc){
+      X[i] <- Y
+    }
+    else{X[i] <- X[i-1]}
    }
  X
 } 
 
-X0sb <- c(5,10,15,20,25,30)
+X0sb <- c(5,15,25)
 
 chains_b <- lapply(X0sb, function(x0) mcmc(MH_newprop(x0, nsteps=10000, f=target)))
 traceplot(chains_b)
@@ -188,9 +170,42 @@ traceplot(chains_b)
 Your solution begins here.
 
 ```{r echo=FALSE}
-
 ### Question 1c
-# INSERT CODE
+
+paralleltemp <- function(num.steps, Ts, sigmas) { #should probably add a target to this distribution
+  M <- length(Ts)
+  samples <- matrix(NA, nrow = num.steps, ncol=M)
+  
+  X <- rep(0, M)
+  
+  for (n in 1:num.steps) {
+      # we are going to do a x-step
+      for (m in 1:M) {
+        y <- X[m] + sigmas[m]*rnorm(1)
+        alpha <- g(y)^(1/Ts[m]) / g(X[m])^(1/Ts[m]) #where does this come from in the algorithm???
+        
+        if (runif(1) <= alpha) {
+          X[m] <- y
+        }
+      }
+      ### we are going for a swap
+      m <- sample(1:(M-1), 1)
+      
+      num = (g(X[m])^(1/Ts[m+1])*g(X[m+1])^(1/Ts[m]))
+      denom = (g(X[m])^(1/Ts[m])*g(X[m+1])^(1/Ts[m+1]))
+      
+      if (runif(1) <= num/denom) {
+        X[c(m, m+1)] = X[c(m+1, m)]
+      }
+    
+    samples[n, ] = X
+  }
+  
+  return(samples)
+}
+
+
+
 ```
 
 # Code appendix
