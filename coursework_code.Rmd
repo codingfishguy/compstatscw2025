@@ -18,6 +18,7 @@ bibliography: ["2025-26_MSc_Statistics_coursework_Rmarkdown_template.bib"]
 link-citations: true
 ---
 
+```{=html}
 <style type="text/css">
 h1{
   font-size: 24pt;
@@ -29,6 +30,7 @@ body{
   font-size: 12pt;
 }
 </style>
+```
 
 ```{r setup, include = FALSE, tidy=TRUE}
 knitr::opts_chunk$set(
@@ -37,6 +39,7 @@ knitr::opts_chunk$set(
 )
 include_solutions <- TRUE
 ```
+
 ```{r setup2, include=FALSE, tidy=TRUE}
 require(rmarkdown)
 require(knitr)
@@ -48,33 +51,85 @@ This Rmarkdown document is intended to provide a basic template that you may use
 
 Please note:
 
-- Rmarkdown syntax for the title and document style;
-- bookdown syntax to label and reference equations;
-- bookdown syntax to referencing literate and provide a bib file;
-- kable syntax to build clean and clear tables that can be referenced;
-- Rmarkdown inline functions to collect and print all code used.
+-   Rmarkdown syntax for the title and document style;
+-   bookdown syntax to label and reference equations;
+-   bookdown syntax to referencing literate and provide a bib file;
+-   kable syntax to build clean and clear tables that can be referenced;
+-   Rmarkdown inline functions to collect and print all code used.
 
-# Sampling from the Cauchy distribution
+# Question 1
+
 Some over-arching comments...
 
-**Part a.**  
-Your solution begins here. Hint: use the inversion method as described by @graham2013stochastic.
+**Part a.**\
+
 ```{r, echo=FALSE}
 
 ### Question 1a
-# INSERT CODE
+library(coda)
+
+target <- function(x) {
+  if (x>=2){
+    return (exp(-3*(x-2)) + exp(-(x-30)^2) + exp(-((x-20)^2)/0.01))
+  }
+  else{
+    return (0)
+  }
+}
+
+t=seq(0,50, length.out=1000)
+plot(t, sapply(t, function(t) target(t)), type="l", xlab="x", ylab = "f(x)")
+
+MetrHastw <- function(X0, sigmaprop, nsteps, f){
+  X <- numeric(nsteps+1) 
+  X[1] <- X0
+  for (i in 2:(nsteps+1)){
+    Y <- rnorm(1, mean=X[i-1],sd=sigmaprop)
+    if (runif(1)<=min(f(Y)/f(X[i-1]),1)){
+      X[i] <- Y}
+    else{ X[i] <- X[i-1]}
+   }
+ X
+} 
+
+#seems larger variance is better when we have 10,000 samples for mixing. All chains converge pretty fast, it's just the different modes that make this distribution difficult.
+
+#Gelman-Rubin is probably unnecessary here since we can see the different modes visually
+
+X0s <- c(2, 5, 10, 15, 20, 25, 30, 35, 40)
+chains1 <-lapply(X0s, function(x0) mcmc(MetrHastw(x0, sigmaprop=1, nsteps=10000, f=target)))
+traceplot(chains1) #maybe some labels would be nice. Particularly that the variance here is 1.
+
+chains2 <-lapply(X0s, function(x0) mcmc(MetrHastw(x0, sigmaprop=2, nsteps=10000, f=target)))
+traceplot(chains2)
+
+chains3 <-lapply(X0s, function(x0) mcmc(MetrHastw(x0, sigmaprop=3, nsteps=10000, f=target)))
+traceplot(chains3)
+
+chains4 <-lapply(X0s, function(x0) mcmc(MetrHastw(x0, sigmaprop=5, nsteps=10000, f=target)))
+traceplot(chains4) #actually ends up completely missing the mass around x=20
+
+chains5 <-lapply(X0s, function(x0) mcmc(MetrHastw(x0, sigmaprop=8, nsteps=10000, f=target)))
+traceplot(chains5) 
+
+chains6 <- lapply(X0s, function(x0) mcmc(MetrHastw(x0, sigmaprop=11, nsteps=10000, f=target)))
+traceplot(chains6) 
+
 ```
 
-
-**Part b.**   
+**Part b.**\
 Your solution begins here.
+
 ```{r echo=FALSE}
 
 ### Question 1b
-# INSERT CODE
+
+
+
+
 ```
 
-**Part c.**  
+**Part c.**\
 Your solution begins here.
 
 ```{r echo=FALSE}
@@ -83,12 +138,11 @@ Your solution begins here.
 # INSERT CODE
 ```
 
-
 # Code appendix
 
 Rather than re-paste all the code to the appendix, here is a trick which makes the markdown file output all the code (without execution) in the appendix, without any duplication.
 
-Please keep in mind to format the code so that the entire code is clearly visible and does not run into the margins of the pdf version.  
+Please keep in mind to format the code so that the entire code is clearly visible and does not run into the margins of the pdf version.
 
 ```{r ref.label=knitr::all_labels(), echo = T, eval = F}
 ```
