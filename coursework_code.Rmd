@@ -85,7 +85,7 @@ MetrHastw <- function(X0, sigmaprop, nsteps, f){
   X[1] <- X0
   for (i in 2:(nsteps+1)){
     Y <- rnorm(1, mean=X[i-1],sd=sigmaprop)
-    if (runif(1)<=min(f(Y)/f(X[i-1]),1)){
+    if (log(runif(1))<=min(log(f(Y))-log(f(X[i-1])),1)){
       X[i] <- Y}
     else{ X[i] <- X[i-1]}
    }
@@ -115,6 +115,11 @@ traceplot(chains5)
 chains6 <- lapply(X0s, function(x0) mcmc(MetrHastw(x0, sigmaprop=11, nsteps=10000, f=target)))
 traceplot(chains6) 
 
+X0s2 <- c(10)
+
+chains_large <- lapply(X0s2, function(x0) mcmc(MetrHastw(x0, sigmaprop=20, nsteps=10000, f=target)))
+traceplot(chains_large) #it seems all of them cover the space but it's hard to see if they find that mode at 20 since they move around so much. Might be easier to focus on fewer chains for this
+
 ```
 
 **Part b.**\
@@ -124,7 +129,31 @@ Your solution begins here.
 
 ### Question 1b
 
+MH_newprop <- function(X0, sigmaprop, nsteps, f){
+  X <- numeric(nsteps+1) 
+  X[1] <- X0
+  newprop <- function(mean, sd){
+    proposal <- rnorm(1, mean=mean, sd=sd)
+    if (proposal>=2){
+      return (proposal)
+    }
+    else{
+      return (2)
+    }
+  }
+  for (i in 2:(nsteps+1)){
+    Y <- newprop(mean=X[i-1], sd=sigmaprop)
+    if (log(runif(1))<=min(log(f(Y))-log(f(X[i-1])),1)){
+      X[i] <- Y}
+    else{ X[i] <- X[i-1]}
+   }
+ X
+} 
 
+X0sb <- c(15)
+
+chains_b <- lapply(X0sb, function(x0) mcmc(MH_newprop(x0, sigmaprop=11, nsteps=10000, f=target)))
+traceplot(chains_b) #seems it worked?
 
 
 ```
