@@ -94,7 +94,7 @@ MetrHastw <- function(X0, sigmaprop, nsteps, f){
 
 #seems larger variance is better when we have 10,000 samples for mixing. All chains converge pretty fast, it's just the different modes that make this distribution difficult.
 
-#Gelman-Rubin is probably unnecessary here since we can see the different modes visually
+#I should also compute the Gelman Rubin statistic for each chain as a quantitative way to display convergence or lack thereof
 
 X0s <- c(2, 5, 10, 15, 20, 25, 30, 35, 40)
 chains1 <-lapply(X0s, function(x0) mcmc(MetrHastw(x0, sigmaprop=1, nsteps=10000, f=target)))
@@ -125,35 +125,61 @@ traceplot(chains_large) #it seems all of them cover the space but it's hard to s
 **Part b.**\
 Your solution begins here.
 
+```{r}
+shifted_exponential <- function(x) {
+  if (x>=2){
+    return (exp(-0.02*(x-2)))
+  }
+  else{
+    return (0)
+  }
+}
+
+plot(t, sapply(t, function(t) shifted_exponential(t)), type="l", xlab="x", ylab = "f(x)") #seems like a relatively good way to do my independence sampler
+
+#can maybe sample from it via inversion method
+
+shifted_samples <- function(lambda){
+  u <- runif(1)
+  return ((2*lambda - log(exp(2*lambda)-u)/lambda))
+} 
+
+
+```
+
+
 ```{r echo=FALSE}
 
 ### Question 1b
 
-MH_newprop <- function(X0, sigmaprop, nsteps, f){
+#Idea: could use an independence sampler
+
+target <- function(x) {
+  if (x>=2){
+    return (exp(-3*(x-2)) + exp(-(x-30)^2) + exp(-((x-20)^2)/0.01))
+  }
+  else{
+    return (0)
+  }
+}
+
+
+MH_newprop <- function(X0, nsteps, f){
   X <- numeric(nsteps+1) 
   X[1] <- X0
-  newprop <- function(mean, sd){
-    proposal <- rnorm(1, mean=mean, sd=sd)
-    if (proposal>=2){
-      return (proposal)
-    }
-    else{
-      return (2)
-    }
-  }
   for (i in 2:(nsteps+1)){
-    Y <- newprop(mean=X[i-1], sd=sigmaprop)
-    if (log(runif(1))<=min(log(f(Y))-log(f(X[i-1])),1)){
+    Y <- shifted_samples(0.1)
+    if (log(runif(1))<=min(log( (f(Y)*shifted_exponential(Y))/(f(X[i-1])*shifted_exponential(X[i-1]))),1)){
       X[i] <- Y}
     else{ X[i] <- X[i-1]}
    }
  X
 } 
 
-X0sb <- c(15)
+X0sb <- c(5,10,15,20,25,30)
 
-chains_b <- lapply(X0sb, function(x0) mcmc(MH_newprop(x0, sigmaprop=11, nsteps=10000, f=target)))
-traceplot(chains_b) #seems it worked?
+chains_b <- lapply(X0sb, function(x0) mcmc(MH_newprop(x0, nsteps=10000, f=target)))
+traceplot(chains_b)
 
 
 ```
