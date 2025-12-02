@@ -66,6 +66,7 @@ Some over-arching comments...
 **Part a.**\
 
 ```{r, echo=FALSE}
+set.seed(17)
 
 ### Question 1a
 library(coda)
