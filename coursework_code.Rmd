@@ -57,6 +57,8 @@ Please note:
 -   kable syntax to build clean and clear tables that can be referenced;
 -   Rmarkdown inline functions to collect and print all code used.
 
+Probably should include a statement of originality here:
+
 # Question 1
 
 Some over-arching comments...
@@ -124,7 +126,6 @@ traceplot(chains_large) #it seems all of them cover the space but it's hard to s
 
 **Part b.**\
 Your solution begins here.
-
 
 ```{r echo=FALSE}
 
