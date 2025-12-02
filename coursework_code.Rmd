@@ -1,20 +1,17 @@
 ---
-title: | 
-  | R Markdown template 
-  | MSc in Statistics, Imperial College London
-author: 'YOUR CID'
-subtitle: ""
+title: "| R Markdown template \n| MSc in Statistics, Imperial College London\n"
+author: "YOUR CID"
+subtitle: ''
 output:
   bookdown::pdf_book:
-    keep_tex: yes
-  bookdown::html_document2:
-    toc: yes
-    toc_float: yes
+    keep_tex: true
+  bookdown::pdf_document2:
+    toc: true
+    toc_float: true
     highlight: tango
   html_document:
-    toc: yes
+    toc: true
     df_print: paged
-bibliography: ["2025-26_MSc_Statistics_coursework_Rmarkdown_template.bib"]
 link-citations: true
 ---
 
@@ -44,6 +41,7 @@ include_solutions <- TRUE
 require(rmarkdown)
 require(knitr)
 require(kableExtra)
+require(formatR)
 # Put any library imports and other preamble here.
 ```
 
@@ -57,16 +55,16 @@ Please note:
 -   kable syntax to build clean and clear tables that can be referenced;
 -   Rmarkdown inline functions to collect and print all code used.
 
-Probably should include a statement of originality here:
+I, 06051710, certify that this assessed coursework is my own work, unless otherwise acknowledged, and includes no plagiarism. I have not discussed my coursework with anyone else except when seeking clarification with the module lecturer via email or on MS Teams. I have not shared any code underlying my coursework with anyone else prior to submission.
 
 # Question 1
 
-Some over-arching comments...
-
 **Part a.**\
+I implemented the standard version of the Random Walk Metropolis Hastings algorithm. The first thing I did, mainly so that I could get a better idea of where to initialise my chain from, was plot the target distribution. See Figure 1 below.
 
-```{r, echo=FALSE}
+```{r fig-q1a1, echo=FALSE, fig.cap="Target function up to proportionality"}
 set.seed(17)
+#could add a histogram here
 
 ### Question 1a
 library(coda)
@@ -82,7 +80,11 @@ target <- function(x) {
 
 t=seq(0,50, length.out=1000)
 plot(t, sapply(t, function(t) target(t)), type="l", xlab="x", ylab = "f(x)")
+```
 
+After this, I ran the random walk metropolis hastings with sigma of 1,2,3,5,8,11 and 20 and plotted the traceplots for each chain. As can be seen,
+
+```{r fig-q1a2, echo=FALSE, fig.cap="Traceplots for different variances in the RWMH algorithm"}
 MetrHastw <- function(X0, sigmaprop, nsteps, f){
   X <- numeric(nsteps+1) 
   X[1] <- X0
@@ -98,30 +100,24 @@ MetrHastw <- function(X0, sigmaprop, nsteps, f){
 #seems larger variance is better when we have 10,000 samples for mixing. All chains converge pretty fast, it's just the different modes that make this distribution difficult.
 
 #I should also compute the Gelman Rubin statistic for each chain as a quantitative way to display convergence or lack thereof
+#Also group all the plots in one figure
 
 X0s <- c(2, 5, 10, 15, 20, 25, 30, 35, 40)
 chains1 <-lapply(X0s, function(x0) mcmc(MetrHastw(x0, sigmaprop=1, nsteps=10000, f=target)))
-traceplot(chains1) #maybe some labels would be nice. Particularly that the variance here is 1.
-
 chains2 <-lapply(X0s, function(x0) mcmc(MetrHastw(x0, sigmaprop=2, nsteps=10000, f=target)))
-traceplot(chains2)
-
 chains3 <-lapply(X0s, function(x0) mcmc(MetrHastw(x0, sigmaprop=3, nsteps=10000, f=target)))
-traceplot(chains3)
-
-chains4 <-lapply(X0s, function(x0) mcmc(MetrHastw(x0, sigmaprop=5, nsteps=10000, f=target)))
-traceplot(chains4) #actually ends up completely missing the mass around x=20
-
+chains4 <-lapply(X0s, function(x0) mcmc(MetrHastw(x0, sigmaprop=5, nsteps=10000, f=target)))#actually ends up completely missing the mass around x=20
 chains5 <-lapply(X0s, function(x0) mcmc(MetrHastw(x0, sigmaprop=8, nsteps=10000, f=target)))
-traceplot(chains5) 
-
 chains6 <- lapply(X0s, function(x0) mcmc(MetrHastw(x0, sigmaprop=11, nsteps=10000, f=target)))
-traceplot(chains6) 
 
-X0s2 <- c(10)
+par(mfrow=c(2,3))  
 
-chains_large <- lapply(X0s2, function(x0) mcmc(MetrHastw(x0, sigmaprop=20, nsteps=10000, f=target)))
-traceplot(chains_large) #it seems all of them cover the space but it's hard to see if they find that mode at 20 since they move around so much. Might be easier to focus on fewer chains for this
+traceplot(chains1); title("σ = 1")
+traceplot(chains2); title("σ = 2")
+traceplot(chains3); title("σ = 3")
+traceplot(chains4); title("σ = 5")
+traceplot(chains5); title("σ = 8")
+traceplot(chains6); title("σ = 11")
 
 ```
 
@@ -132,7 +128,7 @@ Your solution begins here.
 
 ### Question 1b
 
-#Idea: could use an independence sampler
+#should probably add a histogram here
 
 target <- function(x) {
   if (x>=2){
@@ -160,7 +156,7 @@ MH_newprop <- function(X0, nsteps, f){
  X
 } 
 
-X0sb <- c(5,15,25)
+X0sb <- c(15)
 
 chains_b <- lapply(X0sb, function(x0) mcmc(MH_newprop(x0, nsteps=10000, f=target)))
 traceplot(chains_b)
@@ -173,18 +169,27 @@ Your solution begins here.
 
 ```{r echo=FALSE}
 ### Question 1c
+target <- function(x) {
+  if (x>=2){
+    return (exp(-3*(x-2)) + exp(-(x-30)^2) + exp(-((x-20)^2)/0.01))
+  }
+  else{
+    return (0)
+  }
+}
 
-paralleltemp <- function(num.steps, Ts, sigmas) { #should probably add a target to this distribution
+
+paralleltemp <- function(num.steps, Ts, sigmas, g) { #taken from chapter 11 problem set 5.1 solution
   M <- length(Ts)
   samples <- matrix(NA, nrow = num.steps, ncol=M)
   
-  X <- rep(0, M)
+  X <- rep(3, M) #we start at 3 since we know the target has non zero probability here
   
   for (n in 1:num.steps) {
       # we are going to do a x-step
       for (m in 1:M) {
         y <- X[m] + sigmas[m]*rnorm(1)
-        alpha <- g(y)^(1/Ts[m]) / g(X[m])^(1/Ts[m]) #where does this come from in the algorithm???
+        alpha <- g(y)^(1/Ts[m]) / g(X[m])^(1/Ts[m]) 
         
         if (runif(1) <= alpha) {
           X[m] <- y
@@ -206,6 +211,29 @@ paralleltemp <- function(num.steps, Ts, sigmas) { #should probably add a target 
   return(samples)
 }
 
+Ts <- c(1,20,100,200,500) #should probably justify this
+num.steps <- 10000
+sigmas <- c(0.1,0.5,1,2,5)
+samples <- paralleltemp(num.steps, Ts, sigmas, g=target)
+
+plot(samples[,1],type="l")
+hist(samples[100:num.steps, 1], breaks=100, freq=F) #exactly like it should be
+
+```
+
+```{r echo=FALSE}
+### Question 1d
+
+#could compute confidence intervals (but for what???), time each algorithm for large samples, etc. 
+#Look into more tests that can be done
+
+
+```
+
+```{r echo=FALSE}
+### Question 1e
+
+#could compute ESS
 
 
 ```
