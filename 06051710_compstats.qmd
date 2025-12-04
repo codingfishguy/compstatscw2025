@@ -54,7 +54,7 @@ submission.
 
 # Question 1
 
-**Part a.**\
+### Part a
 I implemented the standard version of the Random Walk Metropolis
 Hastings algorithm, using 10,000 samples. The first thing I did, mainly
 so that I could get a better idea of where to initialise my chain from,
@@ -167,7 +167,7 @@ hist(chains6[[4]], breaks=50, freq=F, xlab='x', main='Sigma=11')
 
 ```
 
-**Part b.**\
+### Part b
 The Metropolis-Hasting algorithm I implemented which does not sample
 outside the support of $f(x)$ (my target distribution) is an
 independence sampler, sampling from a Uniform distribution on \[2,45\].
@@ -238,27 +238,26 @@ hist(chains_b[[4]], breaks=50, freq=F, xlab='x', main='Histogram for X0 = 25')
 
 ```
 
-**Part c.**\
+### Part c
 
 The first thing I did to create my parallel tempering algorithm was
 define the temperature schedule my distributions would be based on, seen
-in @fig-6. Initially, I used the same temperatures as in the problem set
-5.1 solution in chapter 11 of the notes, however, I changed the final
+in @fig-6. Initially, I used the same temperatures as in the solution to problem set 5.1 in chapter 11 of the notes, however, I changed the final
 temperature from 500 to 1000, as I felt 500 was still rather steep
-around x=20. I also maintained the same range of standard deviations as in the notes , (0.1,0.5,1,2,5), as they seemed to perform fine.
+around x=20. I also maintained the same range of standard deviations as in the notes, (0.1,0.5,1,2,5), as I found no reason to alter them (they seemed to lead to a fine performance).
 
 The parallel tempering algorithm then worked as follows (again, assuming
 $f$ is the target distribution):
 
 1.  Create a matrix to represent the different chains, with the number
     of rows as the number of samples planned and the number of columns
-    as the number of temperatures
-2.  Call the most recent vector of values $X$. I initialised all chains to the same value, $x=3$, as the distribution has non zero mass around there (when I tried $x=0$ I ran into problems at first since there is 0 probability mass there). 
+    as the number of temperatures.
+2.  Call the most recent vector of values $X$. Initialise all chains to the same value. 
 
 Then I did the following loop for $n=1:N$, where $N$ is the number of
 samples to be taken from the distribution:
 
-3.  Propose a 'horizontal' step for every chain. That is, within each
+3.  Perform a 'horizontal' step for every chain. That is, within each
     chain, propose and accept/reject a new step using the Random Walk
     Metropolis Hastings algorithm, with standard deviation as specified earlier for each chain.
 4.  Sample a number randomly (call it $m$) from $1:M-1$, where $M$ is
@@ -271,7 +270,7 @@ $$
 $$
 After each loop, I updated my matrix recording the samples. After the loop was completed, I returned these samples.
 
-I then plotted the traceplots for the samples from my first chain, as well as a histogram for its density at x=25 (seen in @fig-7). Both the traceplot and the histogram led me to believe my sampler explored the full space and correctly sampled from the target distribution.
+I then plotted the traceplots for the samples from my first chain, as well as a histogram for its density at x=25 (seen in @fig-7). Both the traceplot and the histogram led me to believe my sampler explored the full space well and correctly sampled from the target distribution.
 
 ```{r}
 #| echo: false
@@ -363,11 +362,18 @@ hist(chains_parallel[[4]], breaks=100, freq=F, main='Histogram for X0=25 ', xlab
 ```
 
 
+### Part d
+
+
+
+
+
+
+
 
 
 
 # Code Appendix {#sec-code-appendix}
-
 ```{r ref.label=knitr::all_labels()}
 #| echo: true
 #| eval: false
