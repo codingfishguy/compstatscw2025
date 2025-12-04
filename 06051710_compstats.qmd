@@ -52,8 +52,6 @@ clarification with the module lecturer via email or on MS Teams. I have
 not shared any code underlying my coursework with anyone else prior to
 submission.
 
-REMEMBER TO ADD A CODEBLOCK THAT ADDS CODE TO THE APPENDIX
-
 # Question 1
 
 **Part a.**\
@@ -171,20 +169,30 @@ hist(chains6[[4]], breaks=50, freq=F, xlab='x', main='Sigma=11')
 
 **Part b.**\
 The Metropolis-Hasting algorithm I implemented which does not sample
-outside the support of $f(x)$ (my target distribution) is an independence sampler, sampling from a
-Uniform distribution on [2,45]. I chose 45 as the cutoff point for my distribution as there did not seem to be any probability mass (or anything non negligible) outside of x=45 in my target distribution.
+outside the support of $f(x)$ (my target distribution) is an
+independence sampler, sampling from a Uniform distribution on \[2,45\].
+I chose 45 as the cutoff point for my distribution as there did not seem
+to be any probability mass (or anything non negligible) outside of x=45
+in my target distribution.
 
 The algorithm works in the following way.
 
-I first initialise my chain with some value $X_0 \in \{2,15,20,25,30,35\}$, since these are all close to the modes of my target.
+I first initialise my chain with some value
+$X_0 \in \{2,15,20,25,30,35\}$, since these are all close to the modes
+of my target.
 
 I then repeat the following for $i=1:N$:
 
-1. Sample $Y \sim U[2,45]$
-2. Accept $Y$ as $X_i$, with probability $min(1,f(Y)/f(X_{i-1}))$ (the proposal densities cancel as they are the same for $Y$ and $X_{i-1}$ since they are on a uniform distribution).
-3. If $Y$ is not accepted, let $X_i = X_{i-1}$
+1.  Sample $Y \sim U[2,45]$
+2.  Accept $Y$ as $X_i$, with probability $min(1,f(Y)/f(X_{i-1}))$ (the
+    proposal densities cancel as they are the same for $Y$ and $X_{i-1}$
+    since they are on a uniform distribution).
+3.  If $Y$ is not accepted, let $X_i = X_{i-1}$
 
-As shown in @fig-5, all of the chains reached convergence (though there are so many it is hard to see each individually), so specifically focusing on the chain initialised at $X_0 = 25$, the histogram shows this sampler has converged to the true distribution. 
+As shown in @fig-5, all of the chains reached convergence (though there
+are so many it is hard to see each individually), so specifically
+focusing on the chain initialised at $X_0 = 25$, the histogram shows
+this sampler has converged to the true distribution.
 
 ```{r}
 #| echo: false
@@ -192,8 +200,6 @@ As shown in @fig-5, all of the chains reached convergence (though there are so m
 #| fig-cap: "Plots for independence sampler from a Uniform distribution"
 
 ### Question 1b
-
-#should probably add a histogram here
 
 target <- function(x) {
   if (x>=2){
@@ -234,33 +240,58 @@ hist(chains_b[[4]], breaks=50, freq=F, xlab='x', main='Histogram for X0 = 25')
 
 **Part c.**\
 
+The first thing I did to create my parallel tempering algorithm was
+define the temperature schedule my distributions would be based on, seen
+in @fig-6. Initially, I used the same temperatures as in the problem set
+5.1 solution in chapter 11 of the notes, however, I changed the final
+temperature from 500 to 1000, as I felt 500 was still rather steep
+around x=20. I also maintained the same range of standard deviations as in the notes , (0.1,0.5,1,2,5), as they seemed to perform fine.
+
+The parallel tempering algorithm then worked as follows (again, assuming
+$f$ is the target distribution):
+
+1.  Create a matrix to represent the different chains, with the number
+    of rows as the number of samples planned and the number of columns
+    as the number of temperatures
+2.  Call the most recent vector of values $X$. I initialised all chains to the same value, $x=3$, as the distribution has non zero mass around there (when I tried $x=0$ I ran into problems at first since there is 0 probability mass there). 
+
+Then I did the following loop for $n=1:N$, where $N$ is the number of
+samples to be taken from the distribution:
+
+3.  Propose a 'horizontal' step for every chain. That is, within each
+    chain, propose and accept/reject a new step using the Random Walk
+    Metropolis Hastings algorithm, with standard deviation as specified earlier for each chain.
+4.  Sample a number randomly (call it $m$) from $1:M-1$, where $M$ is
+    the number of chains. Then accept a swap between the most recent
+    sample in chain $m$ and $m+1$ with probability:
+
+$$
+\min(1, \frac{ f(X[m])^{\frac{1}{T_s[m+1]}}\, f(X[m+1])^{\frac{1}{T_s[m]}} }
+     { f(X[m])^{\frac{1}{T_s[m]}}\, f(X[m+1])^{\frac{1}{T_s[m+1]}} })
+$$
+After each loop, I updated my matrix recording the samples. After the loop was completed, I returned these samples.
+
+I then plotted the traceplots for the samples from my first chain, as well as a histogram for its density at x=25 (seen in @fig-7). Both the traceplot and the histogram led me to believe my sampler explored the full space and correctly sampled from the target distribution.
+
 ```{r}
 #| echo: false
-#| label: fig-5
-#| fig-cap: "Plots for parallel tempering algorithm"
+#| label: fig-6
+#| fig-cap: "Tempered probability distributions, comparing T=1 (pink), T=20 (orange), T=100 (green), T=200 (blue), T=1000 (purple)"
 
 ### Question 1c
-target <- function(x) {
-  if (x>=2){
-    return (exp(-3*(x-2)) + exp(-(x-30)^2) + exp(-((x-20)^2)/0.01))
-  }
-  else{
-    return (0)
-  }
-}
-
-
-paralleltemp <- function(num.steps, Ts, sigmas, g) { #taken from chapter 11 problem set 5.1 solution
+paralleltemp <- function(num.steps, Ts, sigmas, g, initial) { #taken from chapter 11 problem set 5.1 solution
   M <- length(Ts)
   samples <- matrix(NA, nrow = num.steps, ncol=M)
   
-  X <- rep(3, M) #we start at 3 since we know the target has non zero probability here
+  X <- rep(initial, M) #we start at 3 since we know the target has non zero probability here
   
   for (n in 1:num.steps) {
       # we are going to do a x-step
       for (m in 1:M) {
         y <- X[m] + sigmas[m]*rnorm(1)
-        alpha <- g(y)^(1/Ts[m]) / g(X[m])^(1/Ts[m]) 
+        
+        #RW Metropolis Hasting Acceptance probability
+        alpha <- g(y)^(1/Ts[m]) / g(X[m])^(1/Ts[m])
         
         if (runif(1) <= alpha) {
           X[m] <- y
@@ -282,16 +313,52 @@ paralleltemp <- function(num.steps, Ts, sigmas, g) { #taken from chapter 11 prob
   return(samples)
 }
 
-Ts <- c(1,20,100,200,500) #should probably justify this
+targetvector <- function(x) {
+  ifelse(
+    x >= 2,
+    exp(-3*(x-2)) + exp(-(x-30)^2) + exp(-((x-20)^2)/0.01),
+    0
+  )
+}
+
+Ts <- c(1,20,100,200,1000) 
+#can plot the tempered distributions
+
+x <- seq(0, 50, length.out = 500)
+
+# empty plot
+plot(NA, xlim = c(0, 50), ylim = c(0, 1), 
+     xlab = "x", ylab = "density")
+
+# colour palette
+cols <- hcl.colors(length(Ts), "Set2")
+
+# add lines
+for (i in seq_along(Ts)) {
+  T <- Ts[i]
+  lines(x, targetvector(x)^(1/T), col = cols[i], lwd = 2)
+}
+```
+
+```{r}
+#| echo: false
+#| label: fig-7
+#| fig-cap: "Plots for parallel tempering algorithm"
 num.steps <- 10000
 sigmas <- c(0.1,0.5,1,2,5)
-samples <- paralleltemp(num.steps, Ts, sigmas, g=target)
+X0s <- c(2, 15, 20, 25, 30, 35)
+
+justchain1 <- function(x0) {
+  return(paralleltemp(num.steps, Ts, sigmas, g=target, initial=x0)[,1])
+}
+
+chains_parallel <-lapply(X0s, function(x0) mcmc(justchain1(x0)))
 
 
 par(mfrow=c(1,2))
 
-plot(samples[,1],type="l", main='Traceplot (initialised at 3)')
-hist(samples[100:num.steps, 1], breaks=100, freq=F, main='Histogram', xlab='x') 
+traceplot(chains_parallel); title("Traceplot for Parallel tempering")
+hist(chains_parallel[[4]], breaks=100, freq=F, main='Histogram for X0=25 ', xlab='x') 
 
 ```
 
@@ -299,7 +366,11 @@ hist(samples[100:num.steps, 1], breaks=100, freq=F, main='Histogram', xlab='x')
 
 
 
+# Code Appendix {#sec-code-appendix}
 
+```{r ref.label=knitr::all_labels()}
+#| echo: true
+#| eval: false
+#| code-fold: true
 
-
-
+```
