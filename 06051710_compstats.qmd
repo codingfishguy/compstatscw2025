@@ -56,7 +56,7 @@ submission.
 
 Throughout this question, I evaluated each sampling algorithm with 1000
 samples. I found this made comparing algorithms easier, especially since
-the traceplots were less dense.
+the traceplots were less dense. I also discarded the first 5 samples of each algorithm as a burn-in period, as that seemed to be the average number of samples before chains found a mode (through traceplots).
 
 The first thing I did, mainly so that I could get a better idea of where
 to initialise my chains from, was plot the target distribution, @fig-1.
@@ -258,62 +258,41 @@ gelman.diag(chains_b)
 The first thing I did to create my parallel tempering algorithm was
 define the temperature schedule my distributions would be based on, seen
 in @fig-6. Initially, I used the same temperatures as in the solution to
-problem set 5.1 in chapter 11 of the notes, however, I changed the final
-temperature from 500 to 1000, as I felt 500 was still rather steep
-around x=20. I also maintained the same range of standard deviations as
-in the notes, (0.1,0.5,1,2,5), as I found no reason to alter them (they
-seemed to lead to a fine performance).
+problem set 5.1 in chapter 11 of the notes, however, I increased the final temperatures (from 200 to 400 and 500 to 1500), as I felt the distribution was still rather steep around some modes at lower temperatures.
+
+For the within temperature transition kernels I used a standard Random Walk Metropolis Hastings, however, I used a different standard deviation in the proposal for each temperature. These were higher than in the example and were 0.5,3,6,9 and 12, for temperatures 1-5 respectively. I chose higher standard deviations for higher temperatures as I felt it would help accomplish the goal of exploring the sample space better with different temperature distributions.
+
+For the between distribution transition kernels, I randomly chose two chains next to each other for the swap (with equal probability) and then conducted the swap with probability as specified in Algorithm 3.2 in Chapter 11 of the notes.
 
 In pseudo-code my algorithm worked as follows (with $g$ as the target
 distribution):
 
 $$
-\begin{array}{l}
-\text{REPEAT FOR NUMBER_OF_SAMPLES:} \\
-\quad \text{FOR EACH CHAIN M:} \\
-\qquad \text{PROPOSE} \quad Y = \text{CURRENT_STATE} + N(0, \sigma[M]) \quad \# \text{RWMH update} \\
-\qquad \text{ACCEPT} \quad Y \text{ AS CURRENT_STATE IF:} \\
-\qquad \quad u \sim \mathcal{U}(0,1) \\
-\qquad \quad u \le \dfrac{(g(Y))^{1/\text{TempM}}}{(g(\text{CURRENT_STATE}))^{1/\text{TempM}}} \\
-\\
-\text{SAMPLE} \quad m \in (1:M-1) \\
-\text{FOR CURRENT_STATES IN CHAIN}(m) \text{ AND CHAIN}(m+1): \\
-\text{SWAP STATES IF:} \\
-\quad u \sim \mathcal{U}(0,1) \\
-\quad u \le \dfrac{(g(\text{STATE}(m)))^{1/\text{Temp}(m+1)} \cdot (g(\text{STATE}(m+1)))^{1/\text{Temp}(m)}}{(g(\text{STATE}m))^{1/\text{Temp}(m)} \cdot (g(\text{STATE}(m+1)))^{1/\text{Temp}(m+1)}}
-\end{array}
+\begin{aligned}
+&\textbf{Repeat for } \text{NUMBEROFSAMPLES:} \\[6pt]
+&\quad \textbf{For each chain } m: \\[4pt]
+&\qquad \text{Propose } 
+    Y = \text{CURRENTSTATE} + N(0, \sigma_m) 
+    \quad\text{(RWMH update)} \\[6pt]
+&\qquad \text{Accept } Y \text{ as current state if } \\[2pt]
+&\qquad\qquad u \sim \mathcal{U}(0,1),\quad
+    u \le 
+    \frac{g(Y)^{1/T_m}}{g(\text{CURRENTSTATE})^{1/T_m}} \\[12pt]
+&\quad \textbf{Swap step:} \\[4pt]
+&\quad \text{Sample } m \in \{1,\dots,\text{NUMCHAINS}-1\} \\[4pt]
+&\quad \text{For most recent states in chain } m \text{ and chain } m+1: \\[4pt]
+&\qquad \text{Swap states if } \\[2pt]
+&\qquad\qquad u \sim \mathcal{U}(0,1),\quad
+u \le 
+\frac{
+    g(\text{STATE}_m)^{1/T_{m+1}} \, g(\text{STATE}_{m+1})^{1/T_m}
+}{
+    g(\text{STATE}_m)^{1/T_m} \, g(\text{STATE}_{m+1})^{1/T_{m+1}}
+}
+\end{aligned}
 $$
 
-The parallel tempering algorithm then worked as follows (again, assuming
-$f$ is the target distribution):
 
-1.  Create a matrix to represent the different chains, with the number
-    of rows as the number of samples planned and the number of columns
-    as the number of temperatures.
-2.  Call the most recent vector of values $X$. Initialise all chains to
-    the same value.
-
-Then I did the following loop for $n=1:N$, where $N$ is the number of
-samples to be taken from the distribution:
-
-3.  Perform a 'horizontal' step for every chain. That is, within each
-    chain, propose and accept/reject a new step using the Random Walk
-    Metropolis Hastings algorithm, with standard deviation as specified
-    earlier for each chain.
-4.  Sample a number randomly (call it $m$) from $1:M-1$, where $M$ is
-    the number of chains. Then accept a swap between the most recent
-    sample in chain $m$ and $m+1$ with probability:
-
-$$
-\min(1, \frac{ f(X[m])^{\frac{1}{T_s[m+1]}}\, f(X[m+1])^{\frac{1}{T_s[m]}} }
-     { f(X[m])^{\frac{1}{T_s[m]}}\, f(X[m+1])^{\frac{1}{T_s[m+1]}} })
-$$ After each loop, I updated my matrix recording the samples. After the
-loop was completed, I returned these samples.
-
-I then plotted the traceplots for the samples from my first chain, as
-well as a histogram for its density at x=25 (seen in @fig-7). Both the
-traceplot and the histogram led me to believe my sampler explored the
-full space well and correctly sampled from the target distribution.
 
 ```{r}
 #| echo: false
@@ -352,7 +331,7 @@ paralleltemp <- function(num.steps, Ts, sigmas, g, initial) { #taken from chapte
     samples[n, ] = X
   }
   
-  return(samples) #should probably discard some burn in
+  return(samples)
 }
 
 targetvector <- function(x) {
@@ -363,7 +342,7 @@ targetvector <- function(x) {
   )
 }
 
-Ts <- c(1,20,100,200,1000) 
+Ts <- c(1,20,100,400,1500) 
 #can plot the tempered distributions
 
 x <- seq(0, 50, length.out = 500)
@@ -385,26 +364,91 @@ for (i in seq_along(Ts)) {
 ```{r}
 #| echo: false
 #| label: fig-7
-#| fig-cap: "Plots for parallel tempering algorithm"
+#| fig-cap: "Traceplot for parallel tempering algorithm"
 num.steps <- 1000 
-sigmas <- c(0.1,0.5,1,2,5)
+sigmas <- c(0.5,3,6,9,12)
 X0s <- c(2, 15, 20, 25, 30, 35)
 
 justchain1 <- function(x0) {
-  return(paralleltemp(num.steps, Ts, sigmas, g=target, initial=x0)[,1])
+  return(paralleltemp(num.steps, Ts, sigmas, g=target, initial=x0)[,1][-(1:5)])
 }
 
 chains_parallel <-lapply(X0s, function(x0) mcmc(justchain1(x0)))
 
 
-par(mfrow=c(1,2))
-
 traceplot(chains_parallel); title("Traceplot for Parallel tempering")
-hist(chains_parallel[[4]], breaks=100, freq=F, main='Histogram for X0=25 ', xlab='x') 
+```
+@fig-7 suggests the chains are exploring the space correctly. Once again I calculated the Gelman-Rubin test statistic as:
+
+```{r}
+#| echo: false
+gelman.diag(chains_parallel)
+```
+which suggested the chains likely all converged to the same distribution.
+
+### Part d
+
+All three algorithms managed to converge to the true distribution, at least after their hyperparameters were altered (seen through traceplots and Gelman-Rubin statistics). To compare the mixing quality of the different algorithms, I found the effective sample size for each algorithm's multiple chains (that were initialised at multiple locations) and then averaged them. For the Random Walk Metropolis Hastings, I let $\sigma = 15$ in the proposal distribution, as that seemed to perform best in part a.
+
+These results suggest the Parallel tempering algorithm mixed the best, as it has the highest ESS, followed by the Independence sampler, and then the RWMH. Perhaps if more tuning was done to the hyperparameters in the RWMH, it could have performed better, however, this demonstrates the effectiveness of the Parallel tempering algorithm for distributions with multiple modes.
+
+
+```{r}
+#| echo: false
+average_ESS <- function(chains){
+  ess <- rep(0,6)
+  for (i in 1:6){
+    ess[i] <- effectiveSize((chains[i]))
+  }
+  return (mean(ess))
+}
+
+res <- data.frame(
+  Method = c("Random Walk", "Independence sampler", "Parallel tempering"),
+  ESS = c(
+    average_ESS(chains6),
+    average_ESS(chains_b),
+    average_ESS(chains_parallel)
+  )
+)
+
+cat("\nAverage ESS by Method\n")
+print(res)
+```
+To compare computational cost, I used the base R function system.time to compare the speeds of all three algorithms. I found the fastest was the independence sampler, followed closely by the random walk metropolis hastings, with the slowest by far being the parallel tempering algorithm (without even mentioning space requirements). This demonstrated a tradeoff between mixing quality and computational efficiency.
+
+```{r}
+#| echo: false
+
+#Speed Tests
+
+system.time({
+   lapply(X0s, function(x0) mcmc(MetrHastw(x0, sigmaprop=15, nsteps=100000, f=target)))
+})
+
+system.time({
+   lapply(X0s, function(x0) mcmc(MH_newprop(x0, nsteps=100000, f=target)))
+})
+
+
+system.time({justchain1 <- function(x0) {
+  return(paralleltemp(num.steps=100000, Ts, sigmas, g=target, initial=x0)[,1][-(1:5)])
+}
+chains_parallel <-lapply(X0s, function(x0) mcmc(justchain1(x0)))
+})
+```
+
+### Part e
+
+```{r}
+#| echo: false
+
+#Obtaining E[X] through numerical integration
+
 
 ```
 
-### Part d
+
 
 # Code Appendix {#sec-code-appendix}
 
