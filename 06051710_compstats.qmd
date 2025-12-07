@@ -56,7 +56,7 @@ submission.
 
 Throughout this question, I evaluated each sampling algorithm with 1000
 samples. I found this made comparing algorithms easier, especially since
-the traceplots were less dense. I also discarded the first 5 samples of each algorithm as a burn-in period, as that seemed to be the average number of samples before chains found a mode (through traceplots).
+the traceplots were less dense. I also discarded the first 5 samples of each algorithm as a burn-in period, as that seemed to be the average number of samples before chains converged to the stationary distribution.
 
 The first thing I did, mainly so that I could get a better idea of where
 to initialise my chains from, was plot the target distribution, @fig-1.
@@ -87,7 +87,7 @@ plot(t, sapply(t, function(t) target(t)), type="l", xlab="x", ylab = "f(x)")
 
 The extremely sharp mode at $x=20$ stood out to me a lot for this
 distribution. As such, I decided to initialise the chains from multiple
-different starting points, to more easily view the mixing. These
+different starting points (throughout question 1), to more easily view convergence to the true distribution. These
 locations were $x=2, 15, 20, 25, 30, 35$, as these were close to the 3
 modes around $x$ =2, 20, and 30.
 
@@ -172,7 +172,7 @@ rownames(res) <- c("Sigma 1", "Sigma 3", "Sigma 5", "Sigma 9", "Sigma 11", "Sigm
 res
 ```
 
-Using the common heuristic approach that $\sqrt{\hat{R}} \leq 1.1$ we
+Using the common heuristic approach that $\sqrt{\hat{R}} \leq 1.1$ I
 find that for standard deviations of 11 and above, the chains likely
 converged to the same distribution, however, it seems a standard
 deviation of 15 is best, as even the upper confidence interval value
@@ -369,11 +369,11 @@ num.steps <- 1000
 sigmas <- c(0.5,3,6,9,12)
 X0s <- c(2, 15, 20, 25, 30, 35)
 
-justchain1 <- function(x0) {
-  return(paralleltemp(num.steps, Ts, sigmas, g=target, initial=x0)[,1][-(1:5)])
+justchain1 <- function(x0, n) {
+  return(paralleltemp(n, Ts, sigmas, g=target, initial=x0)[,1][-(1:5)])
 }
 
-chains_parallel <-lapply(X0s, function(x0) mcmc(justchain1(x0)))
+chains_parallel <-lapply(X0s, function(x0) mcmc(justchain1(x0, n=num.steps)))
 
 
 traceplot(chains_parallel); title("Traceplot for Parallel tempering")
@@ -431,22 +431,203 @@ system.time({
 })
 
 
-system.time({justchain1 <- function(x0) {
+system.time({justchain12 <- function(x0) {
   return(paralleltemp(num.steps=100000, Ts, sigmas, g=target, initial=x0)[,1][-(1:5)])
 }
-chains_parallel <-lapply(X0s, function(x0) mcmc(justchain1(x0)))
+chains_parallel <-lapply(X0s, function(x0) mcmc(justchain12(x0)))
 })
 ```
 
 ### Part e
 
+For $k \in {(a,b,c)}$ a formula for a 95% confidence interval for $\hat{I}_n^{(k)}$, which is the estimator for $E[X]$ (where the distribution is represented by the random variable $X$), is:
+
+$$
+\bigl[ \hat{I}_n^{(k)} - 1.96 \sqrt{\frac{1}{n} (\text{Var}(X_0) + 2 \sum_{k=1}^{n} \frac{n-k}{n} \text{Cov}(X_0, X_k))}, \;\;
+\hat{I}_n^{(k)} + 1.96 \sqrt{\frac{1}{n} (\text{Var}(X_0) + 2 \sum_{k=1}^{n} \frac{n-k}{n} \text{Cov}(X_0, X_k))} \bigr]
+$$
+where $X_0,...$ are the samples from the sampler implemented in part $k$ (again, assuming convergence to a stationary distribution past a burn-in period of 5 samples). To estimate this confidence interval I use the sample variance and autocovariances.
+
+Using numerical integration (specifically the integrate function in R), I find $E[X]$ to be around 25.2. 
+
+Then for each sampler, I produced a chain initialised at $x=20$, as I found in previous sections that when initialised at 20, the chains sampled the space well. I calculated the point estimate for the expected value of the distribution by calculating the mean of the samples, and then used the sample variances and autocovariances up to $\hat{\gamma}_{100}$ (cutting off at 100 as I found there was rarely any substantial covariation past that point), to create the following plots; @fig-8, @fig-9, and @fig-10.
+
+These plots basically confirm the conclusions from part d; the Random Walk sampler had larger confidence intervals for its estimate of $E[X]$ compared to both the independence sampler and the parallel tempering algorithms; with the latter two samplers having less of an obvious difference between their estimates.
+
 ```{r}
 #| echo: false
-
+#| results: "hide"
+#1e
 #Obtaining E[X] through numerical integration
 
+f<- function(x) {
+  return (exp(-3*(x-2)) + exp(-(x-30)^2) + exp(-((x-20)^2)/0.01))
+}
+#splitting the range so we don't miss any of the peaks of the function
+k<- integrate(f, 2, 18)$value + integrate(f, 18, 22)$value + integrate(f,22, 100)$value 
+
+f_norm <- function(x) {
+  return(f(x)/k)
+}
+
+exp_x <- function(x){
+  return (x*f_norm(x))
+}
+
+integrate(exp_x, 2, 50)$value #25.18418- seems reasonable
 
 ```
+
+
+
+
+```{r}
+#| echo: false
+#| label: fig-8
+#| fig-cap: "RWMH Estimate of Expected Value"
+
+#1e
+#Going to use chains initialised at x=20, as those seemed to sample the full space quite well in parts a-c
+
+IhatA <- function(n){
+  samples<- MetrHastw(20, sigmaprop=15, nsteps=n, f=target)
+  xbar <- mean(samples)
+  
+  acovs <- acf(samples, type="covariance", lag.max=100, plot=FALSE)$acf
+  summing <- function(n, a){
+    total <- 0
+    for (k in 1:n){
+      total <- total + ((n-k)/n)*a[k]
+    }
+    return(total)
+  }
+  half_width <- 1.96* sqrt(1/n * (var(samples) + 2* summing(100, acovs)))
+  
+  list(
+    mean = xbar,
+    lower = xbar - half_width,
+    upper = xbar + half_width
+  )
+}
+
+n_vals <- seq(1000, 100000, by = 1000)
+
+results <- t(sapply(n_vals, IhatA))
+results <- as.data.frame(results)
+
+# convert everything except n to numeric
+results[] <- lapply(results, as.numeric)
+
+results$n <- n_vals
+
+library(ggplot2)
+
+ggplot(results, aes(x = n)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2) +
+  geom_line(aes(y = mean), linewidth = 1) +
+  geom_hline(yintercept = 25.18418, color = "red", linewidth = 0.5, linetype = "dashed") +
+  labs(
+    x = "n",
+    y = "E[X] estimate"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+#| echo: false
+#| label: fig-9
+#| fig-cap: "Independence Sampler Estimate of Expected Value"
+
+IhatB <- function(n){
+  samples<- MH_newprop(X0=20, nsteps=n, f=target)
+  xbar <- mean(samples)
+  
+  acovs <- acf(samples, type="covariance", lag.max=100, plot=FALSE)$acf
+  summing <- function(n, a){
+    total <- 0
+    for (k in 1:n){
+      total <- total + ((n-k)/n)*a[k]
+    }
+    return(total)
+  }
+  half_width <- 1.96* sqrt(1/n * (var(samples) + 2* summing(100, acovs)))
+  
+  list(
+    mean = xbar,
+    lower = xbar - half_width,
+    upper = xbar + half_width
+  )
+}
+
+results <- t(sapply(n_vals, IhatB))
+results <- as.data.frame(results)
+
+# convert everything except n to numeric
+results[] <- lapply(results, as.numeric)
+
+results$n <- n_vals
+
+ggplot(results, aes(x = n)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2) +
+  geom_line(aes(y = mean), linewidth = 1) +
+  geom_hline(yintercept = 25.18418, color = "red", linewidth = 0.5, linetype = "dashed") +
+  labs(
+    x = "n",
+    y = "E[X] estimate"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+#| echo: false
+#| label: fig-10
+#| fig-cap: "Parallel Tempering Sampler Estimate of Expected Value"
+
+IhatC <- function(n){
+  samples<- justchain1(20, n)
+  xbar <- mean(samples)
+  
+  acovs <- acf(samples, type="covariance", lag.max=100, plot=FALSE)$acf
+  summing <- function(n, a){
+    total <- 0
+    for (k in 1:n){
+      total <- total + ((n-k)/n)*a[k]
+    }
+    return(total)
+  }
+  half_width <- 1.96* sqrt(1/n * (var(samples) + 2* summing(100, acovs)))
+  
+  list(
+    mean = xbar,
+    lower = xbar - half_width,
+    upper = xbar + half_width
+  )
+}
+
+results <- t(sapply(n_vals, IhatC))
+results <- as.data.frame(results)
+
+# convert everything except n to numeric
+results[] <- lapply(results, as.numeric)
+
+results$n <- n_vals
+
+ggplot(results, aes(x = n)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2) +
+  geom_line(aes(y = mean), linewidth = 1) +
+  geom_hline(yintercept = 25.18418, color = "red", linewidth = 0.5, linetype = "dashed") +
+  labs(
+    x = "n",
+    y = "E[X] estimate"
+  ) +
+  theme_minimal()
+
+```
+
+# Question 2
+
+
+
 
 
 
