@@ -626,6 +626,74 @@ ggplot(results, aes(x = n)) +
 
 # Question 2
 
+```{r}
+
+###
+#2a
+
+library(MASS)
+
+bost_dat <- Boston
+bost_dat <- bost_dat[, c("lstat", "rm", "medv")]
+
+train_idx <- sample(1:nrow(bost_dat), size=0.7*nrow(bost_dat))
+
+train_dat <- bost_dat[train_idx, ]
+test_dat <- bost_dat[-train_idx, ]
+
+head(train_dat,10)
+```
+
+### Part a
+
+```{r}
+#| echo: false
+
+loss <- function(y, q, t){ #y is the actual realisation of the predictors. q is my prediction. t is a quantile level
+  if (y>q){
+    return (t*(y-q))
+  }
+  else{
+    return ((t-1)*(y-q))
+  }
+}
+
+risk <- function(predictions, actuals, t){ #l is my loss function. data is a matrix of my predictions vs reality. t is the quantile level.
+  # Apply the loss function to each pair
+  losses <- mapply(FUN=loss, q=predictions, y=actuals, t=t)
+  # Compute the average loss
+  average_loss <- mean(losses)
+  return (average_loss)
+}
+
+tau <- c(0.1,0.5,0.9)
+
+riskfun <- function(par, t){
+  B0 <- par[1]
+  B1 <- par[2]
+  B2 <- par[3]
+  
+  predictions <- B0 + B1*train_dat$lstat + B2*train_dat$rm
+  actuals <- train_dat$medv #i.e. the response
+  return (risk(predictions, actuals, t))
+}
+
+results <- matrix(0, nrow = length(tau), ncol = 3)
+
+for (i in seq_along(tau)) {
+  t <- tau[i]
+  opt <- round(optim(par = c(5, -5, 5), fn = riskfun, t = t)$par,2)
+  results[i, ] <- opt
+}
+
+results #I think using this I should find the empirical loss on the test set 
+
+
+
+
+
+```
+
 
 
 
